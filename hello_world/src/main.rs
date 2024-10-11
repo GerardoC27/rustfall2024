@@ -1,55 +1,58 @@
-use std::io;
+use std::fs::File;
+use std::io::{Write, BufReader, BufRead, Error};
 
-fn main() {
-    // Hard-coded secret number
-    let secret_number = 42;
-
-    println!("Welcome to the number guessing game!");
-    println!("Guess the secret number between 1 and 100.");
-
-    // Variable to track the number of guesses
-    let mut guess_count = 0;
-
-    loop {
-        // Simulate user input by setting a mutable guess variable
-        let mut guess = String::new();
-
-        println!("Please input your guess.");
-
-        io::stdin()
-            .read_line(&mut guess)
-            .expect("Failed to read line");
-
-        let guess: i32 = match guess.trim().parse() {
-            Ok(num) => num,
-            Err(_) => continue,
-        };
-
-        guess_count += 1;
-
-        // Check the guess using the check_guess function
-        match check_guess(guess, secret_number) {
-            0 => {
-                println!("You win!");
-                break;
-            }
-            1 => println!("Too big!"),
-            -1 => println!("Too small!"),
-            _ => unreachable!(),
-        }
-    }
-
-    // Print the number of guesses it took
-    println!("It took you {} guesses.", guess_count);
+struct Book {
+    title: String,
+    author: String,
+    year: u16,
 }
 
-// Function to check the guess
-fn check_guess(guess: i32, secret: i32) -> i32 {
-    if guess == secret {
-        0
-    } else if guess > secret {
-        1
-    } else {
-        -1
+fn save_books(books: &Vec<Book>, filename: &str) -> Result<(), Error> {
+    let mut file = File::create(filename)?;
+    for book in books {
+        writeln!(file, "{},{},{}", book.title, book.author, book.year)?;
+    }
+    Ok(())
+}
+
+fn load_books(filename: &str) -> Result<Vec<Book>, Error> {
+    let file = File::open(filename)?;
+    let reader = BufReader::new(file);
+    let mut books = Vec::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() == 3 {
+            let book = Book {
+                title: parts[0].to_string(),
+                author: parts[1].to_string(),
+                year: parts[2].parse().unwrap_or(0),
+            };
+            books.push(book);
+        }
+    }
+    Ok(books)
+}
+
+fn main() {
+    let books = vec![
+        Book { title: "1984".to_string(), author: "George Orwell".to_string(), year: 1949 },
+        Book { title: "To Kill a Mockingbird".to_string(), author: "Harper Lee".to_string(), year: 1960 },
+    ];
+
+    match save_books(&books, "books.txt") {
+        Ok(_) => println!("Books saved to file."),
+        Err(e) => println!("Failed to save books: {}", e),
+    }
+
+    match load_books("books.txt") {
+        Ok(loaded_books) => {
+            println!("Loaded books:");
+            for book in loaded_books {
+                println!("{} by {}, published in {}", book.title, book.author, book.year);
+            }
+        }
+        Err(e) => println!("Failed to load books: {}", e),
     }
 }
