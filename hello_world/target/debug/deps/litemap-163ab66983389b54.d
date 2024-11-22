@@ -1,0 +1,11 @@
+/workspaces/rustfall2024/hello_world/target/debug/deps/liblitemap-163ab66983389b54.rmeta: /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/map.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/mod.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/slice_impl.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/vec_impl.rs
+
+/workspaces/rustfall2024/hello_world/target/debug/deps/liblitemap-163ab66983389b54.rlib: /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/map.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/mod.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/slice_impl.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/vec_impl.rs
+
+/workspaces/rustfall2024/hello_world/target/debug/deps/litemap-163ab66983389b54.d: /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/lib.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/map.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/mod.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/slice_impl.rs /home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/vec_impl.rs
+
+/home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/lib.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/map.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/mod.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/slice_impl.rs:
+/home/codespace/.cargo/registry/src/index.crates.io-6f17d22bba15001f/litemap-0.7.3/src/store/vec_impl.rs:
