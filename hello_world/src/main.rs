@@ -1,159 +1,124 @@
-use chrono::Utc;
-use serde::Deserialize;
-use std::{
-    any::Any,
-    fs::OpenOptions,
-    io::Write,
-    thread,
-    time::Duration,
-};
+// File: main.rs
 
-// Struct Definitions
-#[derive(Deserialize, Debug)]
-pub struct Bitcoin;
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
+use reqwest::blocking::Client;
+use chrono::{DateTime, Utc};
+use std::sync::{Arc, Mutex};
+use signal_hook::{consts::SIGINT, iterator::Signals};
 
-#[derive(Deserialize, Debug)]
-pub struct Ethereum;
-
-#[derive(Deserialize, Debug)]
-pub struct SP500;
-
-// Trait Definition
-pub trait Pricing {
-    fn fetch_price(&self) -> Result<f64, Box<dyn std::error::Error>>;
-    fn save_to_file(&self, price: f64) -> Result<(), Box<dyn std::error::Error>>;
-    fn as_any(&self) -> &dyn Any; // Allow downcasting
+// Struct to store website status information
+#[derive(Debug)]
+struct WebsiteStatus {
+    url: String,
+    status: Result<u16, String>, // HTTP status code or error message
+    response_time: Duration,     // Time taken to get a response
+    timestamp: DateTime<Utc>,    // When the check was performed
 }
 
-// Implementations for Bitcoin
-impl Pricing for Bitcoin {
-    fn fetch_price(&self) -> Result<f64, Box<dyn std::error::Error>> {
-        let response = ureq::get("https://api.coindesk.com/v1/bpi/currentprice/BTC.json")
-            .call()?
-            .into_reader();
-        let response: serde_json::Value = serde_json::from_reader(response)?;
-        let price = response["bpi"]["USD"]["rate_float"]
-            .as_f64()
-            .ok_or("Failed to parse Bitcoin price")?;
-        Ok(price)
-    }
-
-    fn save_to_file(&self, price: f64) -> Result<(), Box<dyn std::error::Error>> {
-        let timestamp = Utc::now();
-        let formatted_data = format!("{} - Bitcoin: ${:.2}\n", timestamp, price);
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("bitcoin_price.txt")?;
-        file.write_all(formatted_data.as_bytes())?;
-        Ok(())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
+// Configuration for monitoring
+struct Config {
+    num_threads: usize,
+    timeout: Duration,
+    max_retries: usize,
 }
 
-// Implementations for Ethereum
-impl Pricing for Ethereum {
-    fn fetch_price(&self) -> Result<f64, Box<dyn std::error::Error>> {
-        let response = ureq::get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd")
-            .call()?
-            .into_reader();
-        let response: serde_json::Value = serde_json::from_reader(response)?;
-        let price = response["ethereum"]["usd"]
-            .as_f64()
-            .ok_or("Failed to parse Ethereum price")?;
-        Ok(price)
-    }
+// Function to check the status of a website
+fn check_website(url: &str, timeout: Duration, retries: usize) -> WebsiteStatus {
+    let client = Client::builder().timeout(timeout).build().unwrap();
+    let start_time = Instant::now();
+    let mut attempts = 0;
 
-    fn save_to_file(&self, price: f64) -> Result<(), Box<dyn std::error::Error>> {
-        let timestamp = Utc::now();
-        let formatted_data = format!("{} - Ethereum: ${:.2}\n", timestamp, price);
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("ethereum_price.txt")?;
-        file.write_all(formatted_data.as_bytes())?;
-        Ok(())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-// Implementations for S&P 500
-impl Pricing for SP500 {
-    fn fetch_price(&self) -> Result<f64, Box<dyn std::error::Error>> {
-        let response = ureq::get("https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=YOUR_API_KEY")
-            .call()?
-            .into_reader();
-        let response: serde_json::Value = serde_json::from_reader(response)?;
-
-        // Check for rate-limiting message
-        if let Some(info_message) = response.get("Information") {
-            eprintln!("Rate limit hit: {}", info_message.as_str().unwrap_or("Unknown error"));
-            return Err("Rate limit exceeded".into());
-        }
-
-        // Extract the price from the response
-        let price_str = response["Global Quote"]["05. price"]
-            .as_str()
-            .ok_or("Price field missing in S&P 500 response")?;
-        let price = price_str.parse::<f64>()?;
-        Ok(price)
-    }
-
-    fn save_to_file(&self, price: f64) -> Result<(), Box<dyn std::error::Error>> {
-        let timestamp = Utc::now();
-        let formatted_data = format!("{} - S&P 500: ${:.2}\n", timestamp, price);
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("sp500_price.txt")?;
-        file.write_all(formatted_data.as_bytes())?;
-        Ok(())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-// Main Function
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bitcoin = Bitcoin;
-    let ethereum = Ethereum;
-    let sp500 = SP500;
-
-    let assets: Vec<&dyn Pricing> = vec![&bitcoin, &ethereum, &sp500];
-    let mut sp500_last_fetch = Utc::now() - chrono::Duration::hours(1); // Ensure initial S&P fetch
-
-    loop {
-        for asset in &assets {
-            // S&P 500 fetch logic
-            if let Some(_) = asset.as_any().downcast_ref::<SP500>() {
-                let now = Utc::now();
-                if now.signed_duration_since(sp500_last_fetch).num_seconds() < 3600 {
-                    println!("Skipping S&P 500 fetch: last fetch was within 1 hour.");
-                    continue;
-                }
-                sp500_last_fetch = now; // Update last fetch time
+    // Try to send the request with retries
+    let mut result = Err("Max retries reached".to_string());
+    while attempts <= retries {
+        attempts += 1;
+        match client.get(url).send() {
+            Ok(response) => {
+                result = Ok(response.status().as_u16());
+                break;
             }
-
-            // Fetch and save data
-            match asset.fetch_price() {
-                Ok(price) => {
-                    println!("Fetched price: ${:.2}", price);
-                    if let Err(e) = asset.save_to_file(price) {
-                        eprintln!("Failed to save data: {}", e);
-                    }
+            Err(e) => {
+                if attempts > retries {
+                    result = Err(format!("Failed after {} retries: {}", retries, e));
                 }
-                Err(e) => eprintln!("Failed to fetch price: {}", e),
             }
         }
-
-        thread::sleep(Duration::from_secs(10)); // Adjust delay
     }
+
+    let response_time = start_time.elapsed();
+    WebsiteStatus {
+        url: url.to_string(),
+        status: result,
+        response_time,
+        timestamp: Utc::now(),
+    }
+}
+
+fn main() {
+    // Configuration
+    let config = Config {
+        num_threads: 4,
+        timeout: Duration::from_secs(5),
+        max_retries: 2,
+    };
+
+    // List of websites to monitor
+    let urls = vec![
+        "https://www.google.com",
+        "https://www.rust-lang.org",
+        "https://www.github.com",
+        "https://www.thiswebsitedoesnotexist.com", // Invalid URL for testing
+    ];
+
+    // Shared signal for graceful shutdown
+    let shutdown = Arc::new(Mutex::new(false));
+    let shutdown_clone = Arc::clone(&shutdown);
+
+    // Setup signal handling for SIGINT (Ctrl+C)
+    thread::spawn(move || {
+        let mut signals = Signals::new(&[SIGINT]).expect("Failed to register SIGINT");
+        for _ in signals.forever() {
+            let mut shutdown = shutdown_clone.lock().unwrap();
+            *shutdown = true;
+            break;
+        }
+    });
+
+    // Channel for worker communication
+    let (tx, rx) = mpsc::channel();
+
+    // Spawn worker threads
+    thread::scope(|s| {
+        for chunk in urls.chunks(config.num_threads) {
+            let tx_clone = tx.clone();
+            let urls_chunk = chunk.to_vec();
+            s.spawn(move || {
+                for url in urls_chunk {
+                    let status = check_website(url, config.timeout, config.max_retries);
+                    tx_clone.send(status).unwrap();
+                }
+            });
+        }
+    });
+
+    // Close the sender
+    drop(tx);
+
+    // Collect and display results
+    for result in rx {
+        match &result.status {
+            Ok(code) => println!(
+                "Website: {}, Status Code: {}, Response Time: {:?}, Checked At: {}",
+                result.url, code, result.response_time, result.timestamp
+            ),
+            Err(err) => println!(
+                "Website: {}, Error: {}, Checked At: {}",
+                result.url, err, result.timestamp
+            ),
+        }
+    }
+
+    println!("Shutting down.");
 }
